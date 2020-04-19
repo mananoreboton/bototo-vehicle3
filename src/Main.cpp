@@ -14,7 +14,12 @@
 #define PIN_ULTRASONIC_ECHO 11
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+int16_t temperature = 20;
+int16_t max_distance = 300;
+
 CmdMessenger cmdMessenger = CmdMessenger(Serial);
+HCSR04 ultrasonicSensor = HCSR04(PIN_ULTRASONIC_TRIGGER, PIN_ULTRASONIC_ECHO, temperature, max_distance);
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 enum {
@@ -27,21 +32,16 @@ enum {
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-HCSR04 ultrasonicSensor = HCSR04(PIN_ULTRASONIC_TRIGGER, PIN_ULTRASONIC_ECHO, 20, 300);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-boolean areInitializedGearMotors = false;
 
 void initGearMotors() {
-    if (!areInitializedGearMotors) {
         pinMode(PIN_LEFT_GEARMOTOR_PWD, OUTPUT);
         pinMode(PIN_LEFT_GEARMOTOR_AHEAD, OUTPUT);
         pinMode(PIN_LEFT_GEARMOTOR_REVERSE, OUTPUT);
         pinMode(PIN_RIGHT_GEARMOTOR_PWD, OUTPUT);
         pinMode(PIN_RIGHT_GEARMOTOR_AHEAD, OUTPUT);
         pinMode(PIN_RIGHT_GEARMOTOR_REVERSE, OUTPUT);
-    }
-    areInitializedGearMotors = true;
 }
 
 void move(int speed, int pwdPin, int aheadPin, int reversePin) {
@@ -126,11 +126,13 @@ void attachCommandCallbacks() {
 void setup()
 {
     Serial.begin(9600);
-    cmdMessenger.printLfCr();
-    attachCommandCallbacks();
+
+    initGearMotors();
 
     ultrasonicSensor.begin();
 
+    cmdMessenger.printLfCr();
+    attachCommandCallbacks();
     cmdMessenger.sendCmd(COMMAND_ACK,"Arduino has started!");
 }
 
