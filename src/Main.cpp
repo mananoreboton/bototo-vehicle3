@@ -14,6 +14,8 @@
 #define PIN_ULTRASONIC_ECHO 11
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#define VEHICLE_CRASH_DISTANCE 10
+
 int16_t temperature = 20;
 int16_t max_distance = 300;
 
@@ -36,23 +38,22 @@ enum {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void initGearMotors() {
-        pinMode(PIN_LEFT_GEARMOTOR_PWD, OUTPUT);
-        pinMode(PIN_LEFT_GEARMOTOR_AHEAD, OUTPUT);
-        pinMode(PIN_LEFT_GEARMOTOR_REVERSE, OUTPUT);
-        pinMode(PIN_RIGHT_GEARMOTOR_PWD, OUTPUT);
-        pinMode(PIN_RIGHT_GEARMOTOR_AHEAD, OUTPUT);
-        pinMode(PIN_RIGHT_GEARMOTOR_REVERSE, OUTPUT);
+    pinMode(PIN_LEFT_GEARMOTOR_PWD, OUTPUT);
+    pinMode(PIN_LEFT_GEARMOTOR_AHEAD, OUTPUT);
+    pinMode(PIN_LEFT_GEARMOTOR_REVERSE, OUTPUT);
+    pinMode(PIN_RIGHT_GEARMOTOR_PWD, OUTPUT);
+    pinMode(PIN_RIGHT_GEARMOTOR_AHEAD, OUTPUT);
+    pinMode(PIN_RIGHT_GEARMOTOR_REVERSE, OUTPUT);
 }
 
-void move(int speed, int pwdPin, int aheadPin, int reversePin) {
+void move(uint8_t speed, uint8_t pwdPin, uint8_t aheadPin, uint8_t reversePin) {
     initGearMotors();
     if (speed == 0) {
         digitalWrite(aheadPin, LOW);
         digitalWrite(reversePin, LOW);
     } else if (speed > 0) {
-        digitalWrite(aheadPin, HIGH);
         digitalWrite(reversePin, LOW);
-
+        digitalWrite(aheadPin, HIGH);
     } else if (speed < 0) {
         speed *= -1;
         digitalWrite(aheadPin, LOW);
@@ -61,27 +62,17 @@ void move(int speed, int pwdPin, int aheadPin, int reversePin) {
     analogWrite(pwdPin, speed);
 }
 
-void stop(int pwdPin, int aheadPin, int reversePin) {
-    initGearMotors();
-    analogWrite(pwdPin, 0);
-    digitalWrite(aheadPin, LOW);
-    digitalWrite(reversePin, LOW);
-}
-
-void moveRightGearMotor(int speed) {
+void moveRightGearMotor(uint8_t speed) {
     move(speed, PIN_RIGHT_GEARMOTOR_PWD, PIN_RIGHT_GEARMOTOR_AHEAD, PIN_RIGHT_GEARMOTOR_REVERSE);
 }
 
-void moveLeftGearMotor(int speed) {
+void moveLeftGearMotor(uint8_t speed) {
     move(speed, PIN_LEFT_GEARMOTOR_PWD, PIN_LEFT_GEARMOTOR_AHEAD, PIN_LEFT_GEARMOTOR_REVERSE);
 }
 
-void stopLeftGearMotor() {
-    stop(PIN_LEFT_GEARMOTOR_PWD, PIN_LEFT_GEARMOTOR_AHEAD, PIN_LEFT_GEARMOTOR_REVERSE);
-}
-
-void stopRightGearMotor() {
-    stop(PIN_RIGHT_GEARMOTOR_PWD, PIN_RIGHT_GEARMOTOR_AHEAD, PIN_RIGHT_GEARMOTOR_REVERSE);
+void stopVehicle() {
+    moveRightGearMotor(0);
+    moveLeftGearMotor(0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +87,7 @@ void OnLeftWheelCommand() {
         return;
     }
     moveLeftGearMotor(speed);
+    cmdMessenger.sendCmd(COMMAND_LEFT_GEARMOTOR, speed);
 }
 
 void OnRightWheelCommand() {
@@ -105,11 +97,12 @@ void OnRightWheelCommand() {
         return;
     }
     moveRightGearMotor(speed);
+    cmdMessenger.sendCmd(COMMAND_RIGHT_GEARMOTOR, speed);
 }
 
-void OnSonarCommand(){
+void OnSonarCommand() {
     float distance = ultrasonicSensor.getMedianFilterDistance();
-    cmdMessenger.sendCmd(COMMAND_SONAR,(int)distance);
+    cmdMessenger.sendCmd(COMMAND_SONAR, (int) distance);
 }
 
 
@@ -123,8 +116,7 @@ void attachCommandCallbacks() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void setup()
-{
+void setup() {
     Serial.begin(9600);
 
     initGearMotors();
@@ -133,10 +125,14 @@ void setup()
 
     cmdMessenger.printLfCr();
     attachCommandCallbacks();
-    cmdMessenger.sendCmd(COMMAND_ACK,"Arduino has started!");
+    cmdMessenger.sendCmd(COMMAND_ACK, "Vehicle is ready!");
 }
 
-void loop()
-{
+void loop() {
     cmdMessenger.feedinSerialData();
+    if (ultrasonicSensor.getMedianFilterDistance() <= VEHICLE_CRASH_DISTANCE) {
+        stopVehicle();
+    }
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
