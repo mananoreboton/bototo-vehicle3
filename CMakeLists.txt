@@ -30,4 +30,4 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_executable(Z_DUMMY_TARGET ${SRC_LIST} include/Pin.h include/Messenger.h lib/Sonar/src/Sonar.cpp lib/Sonar/src/Sonar.h lib/GearMotor/src/GearMotor.cpp lib/GearMotor/src/GearMotor.h )
+add_executable(Z_DUMMY_TARGET ${SRC_LIST} include/Pin.h include/GearMotor.h include/Buzzer.h)

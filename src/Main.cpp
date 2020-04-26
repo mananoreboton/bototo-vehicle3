@@ -1,79 +1,30 @@
 
 #include "../.pio/libdeps/uno/HCSR04_ID6099/src/HCSR04.h"
 #include "../.pio/libdeps/uno/CmdMessenger_ID171/CmdMessenger.h"
-
-#define PIN_LEFT_GEARMOTOR_PWD 5
-#define PIN_LEFT_GEARMOTOR_AHEAD 6
-#define PIN_LEFT_GEARMOTOR_REVERSE 7
-
-#define PIN_RIGHT_GEARMOTOR_PWD 10
-#define PIN_RIGHT_GEARMOTOR_AHEAD 8
-#define PIN_RIGHT_GEARMOTOR_REVERSE 9
-
-#define PIN_ULTRASONIC_TRIGGER 3
-#define PIN_ULTRASONIC_ECHO 11
+#include "../.pio/libdeps/uno/TaskScheduler_ID721/src/TaskScheduler.h"
+#include "../include/Pin.h"
+#include "../include/GearMotor.h"
+#include "../include/Buzzer.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define VEHICLE_CRASH_DISTANCE 10
+#define BEEP_DURATION 50
 
-int16_t temperature = 20;
-int16_t max_distance = 300;
+int16_t current_temperature = 20;
+int16_t sonar_max_range = 300;
 
+Scheduler scheduler;
 CmdMessenger cmdMessenger = CmdMessenger(Serial);
-HCSR04 ultrasonicSensor = HCSR04(PIN_ULTRASONIC_TRIGGER, PIN_ULTRASONIC_ECHO, temperature, max_distance);
-
+HCSR04 hcsr04 = HCSR04(PIN_ULTRASONIC_TRIGGER, PIN_ULTRASONIC_ECHO, current_temperature, sonar_max_range);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 enum {
-    COMMAND_LEFT_GEARMOTOR,
-    COMMAND_RIGHT_GEARMOTOR,
-
-    COMMAND_SONAR,
-
-    COMMAND_ACK,
+    COMMAND_RIGHT_GEARMOTOR, //0
+    COMMAND_LEFT_GEARMOTOR,  //1
+    COMMAND_SONAR,           //2
+    COMMAND_HORN,            //3
+    COMMAND_ACK              //4
 };
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void initGearMotors() {
-    pinMode(PIN_LEFT_GEARMOTOR_PWD, OUTPUT);
-    pinMode(PIN_LEFT_GEARMOTOR_AHEAD, OUTPUT);
-    pinMode(PIN_LEFT_GEARMOTOR_REVERSE, OUTPUT);
-    pinMode(PIN_RIGHT_GEARMOTOR_PWD, OUTPUT);
-    pinMode(PIN_RIGHT_GEARMOTOR_AHEAD, OUTPUT);
-    pinMode(PIN_RIGHT_GEARMOTOR_REVERSE, OUTPUT);
-}
-
-void move(uint8_t speed, uint8_t pwdPin, uint8_t aheadPin, uint8_t reversePin) {
-    initGearMotors();
-    if (speed == 0) {
-        digitalWrite(aheadPin, LOW);
-        digitalWrite(reversePin, LOW);
-    } else if (speed > 0) {
-        digitalWrite(reversePin, LOW);
-        digitalWrite(aheadPin, HIGH);
-    } else if (speed < 0) {
-        speed *= -1;
-        digitalWrite(aheadPin, LOW);
-        digitalWrite(reversePin, HIGH);
-    }
-    analogWrite(pwdPin, speed);
-}
-
-void moveRightGearMotor(uint8_t speed) {
-    move(speed, PIN_RIGHT_GEARMOTOR_PWD, PIN_RIGHT_GEARMOTOR_AHEAD, PIN_RIGHT_GEARMOTOR_REVERSE);
-}
-
-void moveLeftGearMotor(uint8_t speed) {
-    move(speed, PIN_LEFT_GEARMOTOR_PWD, PIN_LEFT_GEARMOTOR_AHEAD, PIN_LEFT_GEARMOTOR_REVERSE);
-}
-
-void stopVehicle() {
-    moveRightGearMotor(0);
-    moveLeftGearMotor(0);
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void OnUnknownCommand() {
@@ -81,8 +32,7 @@ void OnUnknownCommand() {
 }
 
 void OnLeftWheelCommand() {
-
-    const int16_t speed = cmdMessenger.readInt16Arg();
+    const int speed = cmdMessenger.readInt16Arg();
     if (!cmdMessenger.isArgOk()) {
         return;
     }
@@ -91,8 +41,7 @@ void OnLeftWheelCommand() {
 }
 
 void OnRightWheelCommand() {
-
-    const int16_t speed = cmdMessenger.readInt16Arg();
+    const int speed = cmdMessenger.readInt16Arg();
     if (!cmdMessenger.isArgOk()) {
         return;
     }
@@ -101,10 +50,15 @@ void OnRightWheelCommand() {
 }
 
 void OnSonarCommand() {
-    float distance = ultrasonicSensor.getMedianFilterDistance();
+    float distance = hcsr04.getMedianFilterDistance();
     cmdMessenger.sendCmd(COMMAND_SONAR, (int) distance);
 }
 
+void honkHorn() {
+    tone(PIN_BUZZER, frequency('b'), BEEP_DURATION * 3);
+//    tone(PIN_BUZZER, frequency(' '), BEEP_DURATION);
+//    tone(PIN_BUZZER, frequency('C'), BEEP_DURATION);
+}
 
 void attachCommandCallbacks() {
     // Attach callback methods
@@ -112,16 +66,39 @@ void attachCommandCallbacks() {
     cmdMessenger.attach(COMMAND_LEFT_GEARMOTOR, OnLeftWheelCommand);
     cmdMessenger.attach(COMMAND_RIGHT_GEARMOTOR, OnRightWheelCommand);
     cmdMessenger.attach(COMMAND_SONAR, OnSonarCommand);
+    cmdMessenger.attach(COMMAND_HORN, honkHorn);
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//void beep_ON();
+//
+//Task task_beep_ON(TASK_IMMEDIATE, TASK_ONCE, &beep_ON, &scheduler, false);
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//void beep_OFF() {
+//    //LEDOff();
+//}
+//
+//void beep_ON() {
+//    //LEDOn();
+//    task_beep_ON.setCallback(&beep_OFF);
+//}
+//
+//void beep() {
+//    task_beep_ON.enable();
+//}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup() {
     Serial.begin(9600);
 
+    scheduler.init();
+    //scheduler.addTask(task_beep);
+
     initGearMotors();
 
-    ultrasonicSensor.begin();
+    hcsr04.begin();
 
     cmdMessenger.printLfCr();
     attachCommandCallbacks();
@@ -129,8 +106,10 @@ void setup() {
 }
 
 void loop() {
+    scheduler.execute();
     cmdMessenger.feedinSerialData();
-    if (ultrasonicSensor.getMedianFilterDistance() <= VEHICLE_CRASH_DISTANCE) {
+    if (hcsr04.getMedianFilterDistance() <= VEHICLE_CRASH_DISTANCE) {
+        honkHorn();
         stopVehicle();
     }
 }
