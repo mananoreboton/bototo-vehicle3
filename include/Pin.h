@@ -18,4 +18,6 @@
 
 #define PIN_BUZZER 2
 
+#define PIN_SERVO 9
+
 #endif //FROMIDE_PIN_H

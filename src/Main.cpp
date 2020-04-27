@@ -2,6 +2,8 @@
 #include "../.pio/libdeps/uno/HCSR04_ID6099/src/HCSR04.h"
 #include "../.pio/libdeps/uno/CmdMessenger_ID171/CmdMessenger.h"
 #include "../.pio/libdeps/uno/TaskScheduler_ID721/src/TaskScheduler.h"
+#include "../.pio/libdeps/uno/Servo_ID883/src/Servo.h"
+
 #include "../include/Pin.h"
 #include "../include/GearMotor.h"
 #include "../include/Buzzer.h"
@@ -16,6 +18,7 @@ int16_t sonar_max_range = 300;
 Scheduler scheduler;
 CmdMessenger cmdMessenger = CmdMessenger(Serial);
 HCSR04 hcsr04 = HCSR04(PIN_ULTRASONIC_TRIGGER, PIN_ULTRASONIC_ECHO, current_temperature, sonar_max_range);
+Servo servoMotor;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 enum {
@@ -23,7 +26,8 @@ enum {
     COMMAND_LEFT_GEARMOTOR,  //1
     COMMAND_SONAR,           //2
     COMMAND_HORN,            //3
-    COMMAND_ACK              //4
+    COMMAND_ACK,             //4
+    COMMAND_SERVO            //5
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +64,11 @@ void honkHorn() {
 //    tone(PIN_BUZZER, frequency('C'), BEEP_DURATION);
 }
 
+void OnSpinServoCommand() {
+    const int angle = cmdMessenger.readInt16Arg();
+    servoMotor.write(angle);
+}
+
 void attachCommandCallbacks() {
     // Attach callback methods
     cmdMessenger.attach(OnUnknownCommand);
@@ -67,6 +76,7 @@ void attachCommandCallbacks() {
     cmdMessenger.attach(COMMAND_RIGHT_GEARMOTOR, OnRightWheelCommand);
     cmdMessenger.attach(COMMAND_SONAR, OnSonarCommand);
     cmdMessenger.attach(COMMAND_HORN, honkHorn);
+    cmdMessenger.attach(COMMAND_SERVO, OnSpinServoCommand);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +112,9 @@ void setup() {
 
     cmdMessenger.printLfCr();
     attachCommandCallbacks();
+
+    servoMotor.attach(PIN_SERVO);
+
     cmdMessenger.sendCmd(COMMAND_ACK, "Vehicle is ready!");
 }
 
