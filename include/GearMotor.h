@@ -5,6 +5,8 @@
 #ifndef FROMIDE_GEARMOTOR_H
 #define FROMIDE_GEARMOTOR_H
 
+int currentSpeed[2] = {0,0};
+
 void initGearMotors() {
     pinMode(PIN_LEFT_GEARMOTOR_PWD, OUTPUT);
     pinMode(PIN_LEFT_GEARMOTOR_AHEAD, OUTPUT);
@@ -30,16 +32,22 @@ void move(int speed, uint8_t pwdPin, uint8_t aheadPin, uint8_t reversePin) {
 }
 
 void moveRightGearMotor(int speed) {
+    currentSpeed[0] = speed;
     move(speed, PIN_RIGHT_GEARMOTOR_PWD, PIN_RIGHT_GEARMOTOR_AHEAD, PIN_RIGHT_GEARMOTOR_REVERSE);
 }
 
 void moveLeftGearMotor(int speed) {
+    currentSpeed[1] = speed;
     move(speed, PIN_LEFT_GEARMOTOR_PWD, PIN_LEFT_GEARMOTOR_AHEAD, PIN_LEFT_GEARMOTOR_REVERSE);
 }
 
 void stopVehicle() {
     moveRightGearMotor(0);
     moveLeftGearMotor(0);
+}
+
+bool isStopped() {
+    return currentSpeed[0] && currentSpeed[1];
 }
 
 #endif //FROMIDE_GEARMOTOR_H
