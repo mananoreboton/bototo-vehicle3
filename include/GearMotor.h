@@ -5,6 +5,7 @@
 #ifndef FROMIDE_GEARMOTOR_H
 #define FROMIDE_GEARMOTOR_H
 
+#define LOW_SPEED 90
 int currentSpeed[2] = {0,0};
 
 void initGearMotors() {
@@ -47,7 +48,21 @@ void stopVehicle() {
 }
 
 bool isStopped() {
-    return currentSpeed[0] && currentSpeed[1];
+    return currentSpeed[0] == 0 && currentSpeed[1] == 0;
+}
+
+int slowDown(int speed) {
+    if(speed > LOW_SPEED) {
+        speed = LOW_SPEED;
+    } else if (speed < -LOW_SPEED) {
+        speed = -LOW_SPEED;
+    }
+    return speed;
+}
+
+void slowDown() {
+    moveRightGearMotor(slowDown(currentSpeed[0]));
+    moveLeftGearMotor(slowDown(currentSpeed[1]));
 }
 
 #endif //FROMIDE_GEARMOTOR_H

@@ -10,6 +10,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define VEHICLE_CRASH_DISTANCE 10
+#define VEHICLE_AWARE_DISTANCE 20
 #define BEEP_DURATION 50
 #define MIDDLE_ANGLE 140
 #define SONAR_MAX_RANGE 300
@@ -35,7 +36,8 @@ enum {
     COMMAND_SERVO,               //5
     COMMAND_OBSTACLE_DISTANCE,   //6
     COMMAND_RUN_AWAY_ANGLE,      //7
-    COMMAND_SEARCH_NEW_PATH      //8
+    COMMAND_SEARCH_NEW_PATH,     //8
+    COMMAND_SLOW_DOWN            //9
 };
 
 void avoidCrash();
@@ -182,12 +184,19 @@ void attachCommandCallbacks() {
 //}
 
 void avoidCrash() {
-    if (hcsr04.getMedianFilterDistance() <= VEHICLE_CRASH_DISTANCE) {
-        if (!isStopped()) {
+    if (!isStopped()) {
+        if (hcsr04.getMedianFilterDistance() <= VEHICLE_CRASH_DISTANCE) {
             tone(PIN_BUZZER, frequency('c'), BEEP_DURATION * 2);
+            stopVehicle();
+            searchNewPath();
         }
-        stopVehicle();
-        searchNewPath();
+        if (hcsr04.getMedianFilterDistance() <= VEHICLE_AWARE_DISTANCE) {
+            slowDown();
+            cmdMessenger.sendCmdStart(COMMAND_SLOW_DOWN);
+            cmdMessenger.sendCmdArg(currentSpeed[0]);
+            cmdMessenger.sendCmdArg(currentSpeed[1]);
+            cmdMessenger.sendCmdEnd();
+        }
     }
 }
 
