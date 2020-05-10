@@ -17,14 +17,14 @@
 #define RUN_AWAY_DISTANCE 30
 #define SONAR_SINGLE_ANGLE 35
 #define SONAR_INITIAL_ANGLE 70
+#define STANDARD_DELAY 900
 
 int16_t current_temperature = 20;
-
+unsigned long timeToAcceptCommand = millis();
 Scheduler scheduler;
 CmdMessenger cmdMessenger = CmdMessenger(Serial);
 HCSR04 hcsr04 = HCSR04(PIN_ULTRASONIC_TRIGGER, PIN_ULTRASONIC_ECHO, current_temperature, SONAR_MAX_RANGE);
 Servo servoMotor;
-bool acceptingCommands = true;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 enum {
@@ -96,10 +96,11 @@ void OnSpinServoCommand() {
 }
 
 bool isAcceptingCommands() {
-    if (!acceptingCommands) {
-        tone(PIN_BUZZER, frequency('g'), BEEP_DURATION * 5);
+    if (millis() <= timeToAcceptCommand) {
+        tone(PIN_BUZZER, frequency('d'), BEEP_DURATION);
+        return false;
     }
-    return acceptingCommands;
+    return true;
 }
 
 void changeDirection(uint8_t angle) {
@@ -129,7 +130,7 @@ void changeDirection(uint8_t angle) {
 }
 
 void searchNewPath() {
-    acceptingCommands = false;
+    timeToAcceptCommand = millis() + (STANDARD_DELAY * 6);
     uint8_t runAwayAngle = 255;
     servoMotor.write(0);
     for (uint8_t i = 0; i * SONAR_SINGLE_ANGLE <= MIDDLE_ANGLE; i++) {
@@ -141,7 +142,7 @@ void searchNewPath() {
         cmdMessenger.sendCmdArg(i * SONAR_SINGLE_ANGLE);
         cmdMessenger.sendCmdArg(distance);
         cmdMessenger.sendCmdEnd();
-        delay(900);
+        delay(STANDARD_DELAY);
         servoMotor.write(((i + 1) * SONAR_SINGLE_ANGLE) - 1);
     }
 
@@ -150,7 +151,7 @@ void searchNewPath() {
         changeDirection(runAwayAngle);
     }
     servoMotor.write(SONAR_INITIAL_ANGLE);
-    acceptingCommands = true;
+    timeToAcceptCommand = millis() + (STANDARD_DELAY * 2);
 }
 
 void attachCommandCallbacks() {
@@ -185,12 +186,12 @@ void attachCommandCallbacks() {
 
 void avoidCrash() {
     if (!isStopped()) {
-        if (hcsr04.getMedianFilterDistance() <= VEHICLE_CRASH_DISTANCE) {
+        float distance = hcsr04.getDistance();
+        if (distance <= VEHICLE_CRASH_DISTANCE) {
             tone(PIN_BUZZER, frequency('c'), BEEP_DURATION * 2);
             stopVehicle();
             searchNewPath();
-        }
-        if (hcsr04.getMedianFilterDistance() <= VEHICLE_AWARE_DISTANCE) {
+        } else if (distance <= VEHICLE_AWARE_DISTANCE) {
             slowDown();
             cmdMessenger.sendCmdStart(COMMAND_SLOW_DOWN);
             cmdMessenger.sendCmdArg(currentSpeed[0]);
